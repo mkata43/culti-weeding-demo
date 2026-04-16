@@ -1,0 +1,26 @@
+weed_before_gndvi
+weed_before_dm
+soy_cover_mean
+until_culti_temp
+after_sowing_temp
+rain_1d
+rain_3d
+rain_7d
+sun_time_1d
+sun_time_3d
+sun_time_7d
+sun_energy_1d
+sun_energy_3d
+sun_energy_7d
+temp_avg
+hum_avg
+air_speed_avg
+work_speed
+work_rate
+row_space
+soy_cover_sd
+green_manure_hairy vetch
+green_manure_mix
+green_manure_no
+culti_type_tine
+mold_boad_On
