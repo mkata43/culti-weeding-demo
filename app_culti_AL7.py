@@ -1,4 +1,3 @@
-# app_culti_AL5_2.3.py
 import os
 import numpy as np
 import pandas as pd
@@ -13,14 +12,17 @@ BASE_DIR = os.path.dirname(__file__)
 
 DATA_PATH = os.path.join(BASE_DIR, "cultivate_dataset_0122.csv")
 
-MODEL_G_PATH      = os.path.join(BASE_DIR, "gndvi_rf_model.joblib")
-MODEL_D_RAW_PATH  = os.path.join(BASE_DIR, "drymatter_rf_model.joblib")
-MODEL_D_LOG_PATH  = os.path.join(BASE_DIR, "drymatter_log1p_rf_model.joblib")
+MODEL_G_PATH = os.path.join(BASE_DIR, "gndvi_rf_model.joblib")
+MODEL_D_RAW_PATH = os.path.join(BASE_DIR, "drymatter_rf_model.joblib")
+MODEL_D_LOG_PATH = os.path.join(BASE_DIR, "drymatter_log1p_rf_model.joblib")
 
 COLS_PATH = os.path.join(BASE_DIR, "model_feature_columns.txt")
 RECO_PATH = os.path.join(BASE_DIR, "recommendation_grid_results.csv")
 
-st.set_page_config(page_title="中耕除草 効果予測デモ（ML_AL7）", layout="wide")
+st.set_page_config(
+    page_title="中耕除草効果予測アプリ（ML_AL7）",
+    layout="wide"
+)
 
 # =========================
 # 1. ユーティリティ
@@ -31,10 +33,12 @@ def safe_float(x, default=0.0):
     except Exception:
         return float(default)
 
+
 def load_feature_cols(path: str):
     with open(path, encoding="utf-8") as f:
         cols = [line.strip() for line in f if line.strip()]
     return cols
+
 
 def make_slider_range(series: pd.Series, fallback_min: float, fallback_max: float, fallback_mid: float):
     if series is None or series.dropna().empty:
@@ -45,10 +49,10 @@ def make_slider_range(series: pd.Series, fallback_min: float, fallback_max: floa
     mn, mx = float(s.min()), float(s.max())
     mid = float(s.median())
     if mn == mx:
-        # 幅が無いとスライダーが動かないので少し広げる
         mn -= 1e-6
         mx += 1e-6
     return mn, mx, mid
+
 
 def build_row_dum(
     controls: dict,
@@ -68,11 +72,9 @@ def build_row_dum(
 
     row_df = pd.DataFrame([row])
 
-    # 数値は数値化
     for c in numeric_cols:
         row_df[c] = pd.to_numeric(row_df[c], errors="coerce")
 
-    # カテゴリは文字列
     for c in cat_cols:
         row_df[c] = row_df[c].astype(str)
 
@@ -80,16 +82,47 @@ def build_row_dum(
     row_dum = row_dum.reindex(columns=feature_cols_expanded, fill_value=0)
     return row_dum
 
+
 def predict_drymatter(model_raw, model_log, row_dum: pd.DataFrame, use_log1p: bool):
     if not use_log1p:
         return float(model_raw.predict(row_dum)[0])
     pred_log = float(model_log.predict(row_dum)[0])
     return float(np.expm1(pred_log))
 
+
+def format_controls_for_display(controls: dict) -> pd.DataFrame:
+    return pd.DataFrame([{
+        "中耕前雑草率 (%)": controls["weed_before_gndvi"],
+        "中耕前雑草乾物重 (g/m²)": controls["weed_before_dm"],
+        "ダイズ被覆率 (%)": controls["soy_cover_mean"],
+        "ダイズ被覆率SD": controls["soy_cover_sd"],
+        "条間 (m)": controls["row_space"],
+        "作業速度 (m/s)": controls["work_speed"],
+        "作業能率 (h/ha)": controls["work_rate"],
+        "緑肥": controls["green_manure"],
+        "中耕機種類": controls["culti_type"],
+        "培土板": controls["mold_boad"],
+        "1日前降雨量 (mm)": controls["rain_1d"],
+        "3日前まで降雨量 (mm)": controls["rain_3d"],
+        "7日前まで降雨量 (mm)": controls["rain_7d"],
+        "1日の日照時間 (h)": controls["sun_time_1d"],
+        "3日の日照時間 (h)": controls["sun_time_3d"],
+        "7日の日照時間 (h)": controls["sun_time_7d"],
+        "1日の積算日射量 (MJ/m²)": controls["sun_energy_1d"],
+        "3日の積算日射量 (MJ/m²)": controls["sun_energy_3d"],
+        "7日の積算日射量 (MJ/m²)": controls["sun_energy_7d"],
+        "平均気温 (℃)": controls["temp_avg"],
+        "平均湿度 (%)": controls["hum_avg"],
+        "平均風速 (m/s)": controls["air_speed_avg"],
+        "中耕までの積算気温 (℃・日)": controls["until_culti_temp"],
+        "播種後積算気温 (℃・日)": controls["after_sowing_temp"],
+    }])
+
+
 # =========================
 # 2. モデル読み込み
 # =========================
-st.sidebar.write("モデル読み込み中…")
+st.sidebar.write("モデル読み込み中...")
 
 if not os.path.exists(COLS_PATH):
     st.error(f"特徴量列ファイルが見つかりません: {COLS_PATH}")
@@ -108,14 +141,12 @@ rf_dm_log = joblib.load(MODEL_D_LOG_PATH)
 
 # =========================
 # 3. データ読み込み（レンジ＆デフォルト生成用）
-#    ※ 推論専用配布で生データを使わないなら、ここをOFFにして固定レンジにできます
 # =========================
 df = None
 if os.path.exists(DATA_PATH):
     df_raw = pd.read_csv(DATA_PATH)
     df_raw.columns = [str(c).replace("\u3000", " ").strip() for c in df_raw.columns]
 
-    # 学習スクリプト側の rename と同等に寄せる（最低限）
     rename_dict = {
         "weed_remain_gndvi(%)": "weed_remain_gndvi",
         "weed_after_dm(g/m2)": "weed_after_dm",
@@ -149,8 +180,7 @@ if os.path.exists(DATA_PATH):
     df = df_raw.rename(columns=rename_dict)
 
 # =========================
-# 4. このモデルで使う入力特徴量（学習結果に合わせる）
-#    model_feature_columns.txt から推測できる「元の列」セット（ML_AL5の学習スクリプト相当）
+# 4. 入力特徴量
 # =========================
 numeric_cols = [
     "weed_before_gndvi",
@@ -171,7 +201,6 @@ numeric_cols = [
 ]
 cat_cols = ["green_manure", "culti_type", "mold_boad"]
 
-# デフォルト値（データが無い場合のフォールバック）
 defaults = {
     "weed_before_gndvi": 20.0,
     "weed_before_dm": 50.0,
@@ -193,45 +222,40 @@ defaults = {
     "mold_boad": "OFF",
 }
 
-# カテゴリ候補（データがあればそこから、無ければ最低限の候補）
 if df is not None:
     green_choices = sorted(df["green_manure"].dropna().astype(str).unique()) if "green_manure" in df.columns else ["barley", "hairy vetch", "mix", "no"]
     culti_choices = sorted(df["culti_type"].dropna().astype(str).unique()) if "culti_type" in df.columns else ["tine", "Rotaly"]
-    mold_choices  = sorted(df["mold_boad"].dropna().astype(str).unique()) if "mold_boad" in df.columns else ["OFF", "On"]
+    mold_choices = sorted(df["mold_boad"].dropna().astype(str).unique()) if "mold_boad" in df.columns else ["OFF", "On"]
 else:
     green_choices = ["barley", "hairy vetch", "mix", "no"]
     culti_choices = ["tine", "Rotaly"]
-    mold_choices  = ["OFF", "On"]
+    mold_choices = ["OFF", "On"]
 
-# 数値レンジ（データがあればそこから）
 ranges = {}
 for c in numeric_cols:
     if df is not None and c in df.columns:
-        ranges[c] = make_slider_range(df[c], defaults[c]*0.5, defaults[c]*1.5, defaults[c])
+        ranges[c] = make_slider_range(df[c], defaults[c] * 0.5, defaults[c] * 1.5, defaults[c])
     else:
-        # フォールバックは適当に±50%（0〜のものは0〜2倍）
         if defaults[c] >= 0:
-            ranges[c] = (0.0, max(1.0, defaults[c]*2.0), defaults[c])
+            ranges[c] = (0.0, max(1.0, defaults[c] * 2.0), defaults[c])
         else:
-            ranges[c] = (defaults[c]*2.0, defaults[c]*0.5, defaults[c])
+            ranges[c] = (defaults[c] * 2.0, defaults[c] * 0.5, defaults[c])
 
-# 目的変数のmin/max（スコア正規化用）
 if df is not None and "weed_remain_gndvi" in df.columns:
-    g_min, g_max = float(pd.to_numeric(df["weed_remain_gndvi"], errors="coerce").min()), float(pd.to_numeric(df["weed_remain_gndvi"], errors="coerce").max())
+    g_min = float(pd.to_numeric(df["weed_remain_gndvi"], errors="coerce").min())
+    g_max = float(pd.to_numeric(df["weed_remain_gndvi"], errors="coerce").max())
 else:
     g_min, g_max = 0.0, 100.0
 
 if df is not None and "weed_after_dm" in df.columns:
-    d_min, d_max = float(pd.to_numeric(df["weed_after_dm"], errors="coerce").min()), float(pd.to_numeric(df["weed_after_dm"], errors="coerce").max())
+    d_min = float(pd.to_numeric(df["weed_after_dm"], errors="coerce").min())
+    d_max = float(pd.to_numeric(df["weed_after_dm"], errors="coerce").max())
 else:
-    # 生データ無しなら、推薦CSVの予測レンジから作る（あれば）
     d_min, d_max = 0.0, 200.0
 
-# 推薦結果
 reco_df = None
 if os.path.exists(RECO_PATH):
     reco_df = pd.read_csv(RECO_PATH)
-    # 予測レンジが使えるならdrymatterのmin/max補助に
     if "pred_weed_after_dm" in reco_df.columns and (df is None or "weed_after_dm" not in df.columns):
         d_min = float(pd.to_numeric(reco_df["pred_weed_after_dm"], errors="coerce").min())
         d_max = float(pd.to_numeric(reco_df["pred_weed_after_dm"], errors="coerce").max())
@@ -240,39 +264,25 @@ if os.path.exists(RECO_PATH):
 # 5. UI（サイドバー）
 # =========================
 st.sidebar.title("条件入力（ML_AL7）")
+st.sidebar.caption("中耕前条件、作業条件、機械条件、気象条件を入力してください。")
 
 use_log1p = st.sidebar.toggle("乾物重は log1p モデルを使用", value=True)
 st.sidebar.caption("ON: drymatter_log1p_rf_model.joblib（出力は expm1 で g/m²に戻します）")
 
 st.sidebar.markdown("### ① 中耕前条件")
-weed_before_gndvi = st.sidebar.slider(
-    "weed_before_gndvi（%）",
-    *ranges["weed_before_gndvi"]
-)
-weed_before_dm = st.sidebar.slider(
-    "weed_before_dm（g/m²）",
-    *ranges["weed_before_dm"]
-)
-soy_cover_mean = st.sidebar.slider(
-    "soy_cover_mean（%）",
-    *ranges["soy_cover_mean"]
-)
-soy_cover_sd = st.sidebar.slider(
-    "soy_cover_sd（被覆率SD）",
-    *ranges["soy_cover_sd"]
-)
+weed_before_gndvi = st.sidebar.slider("weed_before_gndvi（%）", *ranges["weed_before_gndvi"])
+weed_before_dm = st.sidebar.slider("weed_before_dm（g/m²）", *ranges["weed_before_dm"])
+soy_cover_mean = st.sidebar.slider("soy_cover_mean（%）", *ranges["soy_cover_mean"])
+soy_cover_sd = st.sidebar.slider("soy_cover_sd（被覆率SD）", *ranges["soy_cover_sd"])
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ② 作業条件")
 
-# row_space を 0.65～0.78 の連続スライダーで固定（df の unique に依存しない）
-# 既存の中央値（ranges["row_space"][2]）が使えるなら、その値を初期値にする
 try:
     default_rs = float(ranges["row_space"][2])
 except Exception:
     default_rs = 0.75
 
-# 範囲内に丸める
 default_rs = min(max(default_rs, 0.65), 0.78)
 
 row_space = st.sidebar.slider(
@@ -283,22 +293,26 @@ row_space = st.sidebar.slider(
     step=0.01
 )
 
-# ★ ここが重要：work_speed / work_rate を必ず定義（NameError回避）
-work_speed = st.sidebar.slider(
-    "work_speed（m/s）",
-    *ranges["work_speed"]
-)
-
-work_rate = st.sidebar.slider(
-    "work_rate（h/ha）",
-    *ranges["work_rate"]
-)
+work_speed = st.sidebar.slider("work_speed（m/s）", *ranges["work_speed"])
+work_rate = st.sidebar.slider("work_rate（h/ha）", *ranges["work_rate"])
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ③ 機械・緑肥条件")
-green_manure = st.sidebar.selectbox("green_manure", green_choices, index=green_choices.index(defaults["green_manure"]) if defaults["green_manure"] in green_choices else 0)
-culti_type   = st.sidebar.selectbox("culti_type", culti_choices, index=culti_choices.index(defaults["culti_type"]) if defaults["culti_type"] in culti_choices else 0)
-mold_boad    = st.sidebar.selectbox("mold_boad", mold_choices, index=mold_choices.index(defaults["mold_boad"]) if defaults["mold_boad"] in mold_choices else 0)
+green_manure = st.sidebar.selectbox(
+    "green_manure",
+    green_choices,
+    index=green_choices.index(defaults["green_manure"]) if defaults["green_manure"] in green_choices else 0
+)
+culti_type = st.sidebar.selectbox(
+    "culti_type",
+    culti_choices,
+    index=culti_choices.index(defaults["culti_type"]) if defaults["culti_type"] in culti_choices else 0
+)
+mold_boad = st.sidebar.selectbox(
+    "mold_boad",
+    mold_choices,
+    index=mold_choices.index(defaults["mold_boad"]) if defaults["mold_boad"] in mold_choices else 0
+)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ④ 気象・積算")
@@ -315,7 +329,7 @@ sun_energy_3d = st.sidebar.slider("sun_energy_3d（MJ/m²）", *ranges["sun_ener
 sun_energy_7d = st.sidebar.slider("sun_energy_7d（MJ/m²）", *ranges["sun_energy_7d"])
 
 temp_avg = st.sidebar.slider("temp_avg（℃）", *ranges["temp_avg"])
-hum_avg  = st.sidebar.slider("hum_avg（%）", *ranges["hum_avg"])
+hum_avg = st.sidebar.slider("hum_avg（%）", *ranges["hum_avg"])
 air_speed_avg = st.sidebar.slider("air_speed_avg（m/s）", *ranges["air_speed_avg"])
 
 until_culti_temp = st.sidebar.slider("until_culti_temp（℃・日）", *ranges["until_culti_temp"])
@@ -355,7 +369,6 @@ row_dum = build_row_dum(
 pred_g = float(rf_gndvi.predict(row_dum)[0])
 pred_d = predict_drymatter(rf_dm_raw, rf_dm_log, row_dum, use_log1p=use_log1p)
 
-# 正規化スコア（小さいほど良い）
 g_norm = (pred_g - g_min) / (g_max - g_min + 1e-9)
 d_norm = (pred_d - d_min) / (d_max - d_min + 1e-9)
 score = 0.5 * g_norm + 0.5 * d_norm
@@ -368,42 +381,61 @@ bar_value = 1.0 - score_clipped
 tab_pred, tab_map, tab_reco = st.tabs(["予測結果", "ヒートマップ", "レコメンド一覧"])
 
 with tab_pred:
-    st.title("中耕除草 効果予測デモ（ML_AL7：NGRDI × 乾物重）")
-    st.caption(f"モデル: NGDRI=RF / Drymatter={'RF log1p' if use_log1p else 'RF raw'}")
+    st.title("中耕除草効果予測アプリ（ML_AL7：NGRDI × 乾物重）")
+    st.caption(f"モデル: NGRDI = Random Forest / Dry matter = {'Random Forest (log1p)' if use_log1p else 'Random Forest (raw)'}")
+    st.caption("研究用デモ版")
 
-    st.markdown("#### 入力した条件")
-    st.dataframe(pd.DataFrame([controls]))
+    st.markdown("""
+### このアプリについて
+このアプリは、中耕除草前の雑草量・ダイズ被覆率・作業条件・気象条件などを入力すると、  
+**中耕後の残草率** と **残草乾物重** を機械学習モデルで予測します。
 
+### 出力される指標
+- **予測残草率（NGRDIベース, %）**
+- **予測残草乾物重（g/m²）**
+- **総合スコア（0に近いほど良い条件）**
+
+### 利用上の注意
+このアプリの出力は、学習データに基づく**推定値**です。  
+現場での判断や結論づけには、追加の検証と実測確認を併用してください。
+""")
+
+    st.markdown("#### 入力条件")
+    display_controls = format_controls_for_display(controls)
+    st.dataframe(display_controls, use_container_width=True)
+
+    st.markdown("#### 予測結果")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("予測残草率（NGDRIベース, %）", f"{pred_g:.2f}")
+        st.metric("予測残草率（NGRDIベース, %）", f"{pred_g:.2f}")
     with col2:
         st.metric("予測残草乾物重（g/m²）", f"{pred_d:.2f}")
     with col3:
-        st.metric("総合スコア（0=最良〜1=最悪）", f"{score_clipped:.3f}")
+        st.metric("総合スコア", f"{score_clipped:.3f}")
 
-    st.markdown("#### 総合評価（0に近いほど良い条件）")
+    st.markdown("#### 総合評価")
     st.progress(bar_value)
-    st.markdown(f"総合スコア値: **{score_clipped:.3f}**（0:最良〜1:最悪）")
+    st.write(f"総合スコア: **{score_clipped:.3f}** （0に近いほど良い条件）")
 
-    # ログ保存
-    if st.button("この条件と予測結果をCSVに保存する"):
-        log_path = os.path.join(BASE_DIR, "app_prediction_log.csv")
-        save_row = {
-            **controls,
-            "pred_weed_remain_gndvi": pred_g,
-            "pred_weed_after_dm": pred_d,
-            "g_norm": g_norm,
-            "d_norm": d_norm,
-            "total_score": score,
-            "drymatter_model": "log1p" if use_log1p else "raw",
-        }
-        save_df = pd.DataFrame([save_row])
-        if os.path.exists(log_path):
-            save_df.to_csv(log_path, mode="a", header=False, index=False, encoding="utf-8-sig")
-        else:
-            save_df.to_csv(log_path, index=False, encoding="utf-8-sig")
-        st.success(f"保存しました: {log_path}")
+    st.markdown("#### 結果のダウンロード")
+    download_row = {
+        **controls,
+        "pred_weed_remain_gndvi": pred_g,
+        "pred_weed_after_dm": pred_d,
+        "g_norm": g_norm,
+        "d_norm": d_norm,
+        "total_score": score_clipped,
+        "drymatter_model": "log1p" if use_log1p else "raw",
+    }
+    download_df = pd.DataFrame([download_row])
+    csv_data = download_df.to_csv(index=False, encoding="utf-8-sig")
+
+    st.download_button(
+        label="この条件と予測結果をCSVでダウンロード",
+        data=csv_data,
+        file_name="culti_prediction_result.csv",
+        mime="text/csv",
+    )
 
     st.markdown("---")
     st.caption("※ 推定値です。現場適用や結論づけには追加検証を推奨します。")
@@ -415,7 +447,6 @@ def plot_heatmap_mean(df_hm, row_key, col_key, value_key, title, xlabel, ylabel)
         return
 
     tmp = df_hm.copy()
-    # 文字列揺れ吸収（念のため）
     tmp[row_key] = tmp[row_key]
     tmp[col_key] = tmp[col_key].astype(str)
 
@@ -428,8 +459,8 @@ def plot_heatmap_mean(df_hm, row_key, col_key, value_key, title, xlabel, ylabel)
         .sort_index(axis=1)
     )
 
-    fig, ax = plt.subplots()
-    im = ax.imshow(pivot.values, origin="lower")
+    fig, ax = plt.subplots(figsize=(8, 5))
+    im = ax.imshow(pivot.values, origin="lower", aspect="auto")
 
     ax.set_xticks(range(len(pivot.columns)))
     ax.set_xticklabels([f"{safe_float(c):.2f}" for c in pivot.columns], rotation=45, ha="right")
@@ -452,22 +483,41 @@ def plot_heatmap_mean(df_hm, row_key, col_key, value_key, title, xlabel, ylabel)
 
 with tab_map:
     st.header("ヒートマップ（推薦結果ベース）")
+    st.caption("値が小さいほど望ましい条件です。")
 
     if reco_df is None:
-        st.info("recommendation_grid_results.csv が見つかりません。学習スクリプトで出力されたCSVを ml_outputs に置いてください。")
+        st.info("recommendation_grid_results.csv が見つかりません。学習スクリプトで出力されたCSVを配置してください。")
     else:
-        # 例：条間×緑肥、条間×カルチ
         st.markdown("##### 条間 × 緑肥（平均 total_score）")
-        plot_heatmap_mean(reco_df, "row_space", "green_manure", "total_score",
-                          "row_space × green_manure", "row_space (m)", "green_manure")
+        plot_heatmap_mean(
+            reco_df,
+            "row_space",
+            "green_manure",
+            "total_score",
+            "row_space × green_manure",
+            "row_space (m)",
+            "green_manure"
+        )
 
-        st.markdown("##### 条間 × カルチ種類（平均 total_score）")
-        plot_heatmap_mean(reco_df, "row_space", "culti_type", "total_score",
-                          "row_space × culti_type", "row_space (m)", "culti_type")
+        st.markdown("##### 条間 × 中耕機種類（平均 total_score）")
+        plot_heatmap_mean(
+            reco_df,
+            "row_space",
+            "culti_type",
+            "total_score",
+            "row_space × culti_type",
+            "row_space (m)",
+            "culti_type"
+        )
 
 with tab_reco:
     st.header("レコメンド一覧（total_score 小さい順）")
+    st.caption("値が小さいほど望ましい条件です。")
+
     if reco_df is None:
         st.info("recommendation_grid_results.csv が見つかりません。")
     else:
-        st.dataframe(reco_df.sort_values("total_score").head(100))
+        st.dataframe(
+            reco_df.sort_values("total_score").head(100),
+            use_container_width=True
+        )
