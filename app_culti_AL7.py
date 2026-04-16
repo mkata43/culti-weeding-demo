@@ -153,32 +153,31 @@ def encode_dataframe_for_model(
 
 def clean_feature_name(name: str) -> str:
     return (
-        name.replace("weed_before_gndvi", "中耕前雑草率")
-            .replace("weed_before_dm", "中耕前雑草乾物重")
-            .replace("soy_cover_mean", "ダイズ被覆率")
-            .replace("soy_cover_sd", "ダイズ被覆率SD")
-            .replace("until_culti_temp", "中耕までの積算気温")
-            .replace("after_sowing_temp", "播種後積算気温")
-            .replace("rain_1d", "1日前降雨量")
-            .replace("rain_3d", "3日前まで降雨量")
-            .replace("rain_7d", "7日前まで降雨量")
-            .replace("sun_time_1d", "1日の日照時間")
-            .replace("sun_time_3d", "3日の日照時間")
-            .replace("sun_time_7d", "7日の日照時間")
-            .replace("sun_energy_1d", "1日の積算日射量")
-            .replace("sun_energy_3d", "3日の積算日射量")
-            .replace("sun_energy_7d", "7日の積算日射量")
-            .replace("temp_avg", "平均気温")
-            .replace("hum_avg", "平均湿度")
-            .replace("air_speed_avg", "平均風速")
-            .replace("work_speed", "作業速度")
-            .replace("work_rate", "作業能率")
-            .replace("row_space", "条間")
-            .replace("green_manure_", "緑肥:")
-            .replace("culti_type_", "中耕機種類:")
-            .replace("mold_boad_", "培土板:")
+        name.replace("weed_before_gndvi", "Weed coverage before cultivation")
+            .replace("weed_before_dm", "Weed dry weight before cultivation")
+            .replace("soy_cover_mean", "Soybean coverage")
+            .replace("soy_cover_sd", "Soybean coverage SD")
+            .replace("until_culti_temp", "Accumulated temp. until cultivation")
+            .replace("after_sowing_temp", "Accumulated temp. after sowing")
+            .replace("rain_1d", "Rainfall 1 day")
+            .replace("rain_3d", "Rainfall 3 days")
+            .replace("rain_7d", "Rainfall 7 days")
+            .replace("sun_time_1d", "Sunshine duration 1 day")
+            .replace("sun_time_3d", "Sunshine duration 3 days")
+            .replace("sun_time_7d", "Sunshine duration 7 days")
+            .replace("sun_energy_1d", "Solar radiation 1 day")
+            .replace("sun_energy_3d", "Solar radiation 3 days")
+            .replace("sun_energy_7d", "Solar radiation 7 days")
+            .replace("temp_avg", "Mean temperature")
+            .replace("hum_avg", "Mean humidity")
+            .replace("air_speed_avg", "Mean wind speed")
+            .replace("work_speed", "Work speed")
+            .replace("work_rate", "Work rate")
+            .replace("row_space", "Row spacing")
+            .replace("green_manure_", "Green manure: ")
+            .replace("culti_type_", "Cultivator type: ")
+            .replace("mold_boad_", "Mold board: ")
     )
-
 
 @st.cache_resource
 def get_tree_explainer(_model):
@@ -804,7 +803,7 @@ with tab_shap:
                 g_shap_row,
                 feature_names=feature_names,
                 top_n=12,
-                title="局所SHAP（残草率モデル）"
+                title="Local SHAP (weed coverage model)"
             )
 
     with subtab2:
@@ -819,7 +818,7 @@ with tab_shap:
                 d_shap_row,
                 feature_names=feature_names,
                 top_n=12,
-                title=f"局所SHAP（乾物重モデル: {'log1p' if use_log1p else 'raw'}）"
+                title=f"Local SHAP（weed dry weight model: {'log1p' if use_log1p else 'raw'}）"
             )
 
     with subtab3:
