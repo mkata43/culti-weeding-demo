@@ -181,8 +181,8 @@ def clean_feature_name(name: str) -> str:
 
 
 @st.cache_resource
-def get_tree_explainer(model):
-    return shap.TreeExplainer(model)
+def get_tree_explainer(_model):
+    return shap.TreeExplainer(_model)
 
 
 @st.cache_data(show_spinner=False)
